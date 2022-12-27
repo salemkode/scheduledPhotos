@@ -116,5 +116,10 @@ bot.on("message:photo", onlyAdmin, handleImage);
 // Set up a scheduled task to send the first image in the list every day at 8:00 PM
 cron.schedule("* * 20 * * *", sendScheduledPhotos);
 
+// 
+bot.command("work", ctx => {
+  ctx.reply("The bot is work")
+})
+
 // start bot
 bot.start();
