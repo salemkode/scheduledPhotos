@@ -42,35 +42,19 @@ const fs = __importStar(require("fs"));
 const dotenv = __importStar(require("dotenv"));
 const prompt_sync_1 = __importDefault(require("prompt-sync"));
 // Check if the .env file exists
-if (!fs.existsSync('.env')) {
-    console.log('Please enter the following environment variables:');
+if (!fs.existsSync(".env")) {
+    console.log("Please enter the following environment variables:");
     // Use the prompt-sync module to prompt the user for the bot token and chat ID
     const prompt = (0, prompt_sync_1.default)();
-    const botToken = prompt('Bot token: ');
+    const botToken = prompt("Bot token: ");
     const adminId = prompt("admin chat id: ");
-    const chatId = prompt('Chat ID: ');
+    const chatId = prompt("Chat ID: ");
     // Write the environment variables to the .env file
     const envVars = `BOT_TOKEN=${botToken}\nCHAT_ID=${chatId}\nADMIN_CHAT_ID=${adminId}`;
-    fs.writeFileSync('.env', envVars);
+    fs.writeFileSync(".env", envVars);
 }
-console.log("Telegram bot run");
 dotenv.config();
 const bot = new grammy_1.Bot((_a = process.env) === null || _a === void 0 ? void 0 : _a.BOT_TOKEN);
-/** Measures the response time of the bot, and logs it to `console` */
-function responseTime(_ctx, next // is an alias for: () => Promise<void>
-) {
-    return __awaiter(this, void 0, void 0, function* () {
-        // take time before
-        const before = Date.now(); // milliseconds
-        // invoke downstream middleware
-        yield next(); // make sure to `await`!
-        // take time after
-        const after = Date.now(); // milliseconds
-        // log difference
-        console.log(`Response time: ${after - before} ms`);
-    });
-}
-bot.use(responseTime);
 let scheduledPhotos = []; // Create an empty array to store the scheduled image IDs
 function scheduledPhotosPush(imageId) {
     scheduledPhotos.push(imageId);
@@ -82,44 +66,69 @@ function scheduledPhotosShift() {
 }
 function onlyAdmin(ctx, next) {
     var _a, _b;
-    console.log("run");
-    if (((_a = ctx.chat) === null || _a === void 0 ? void 0 : _a.id) === ((_b = process.env) === null || _b === void 0 ? void 0 : _b.ADMIN_CHAT_ID)) {
+    if (((_a = ctx.chat) === null || _a === void 0 ? void 0 : _a.id) == ((_b = process.env) === null || _b === void 0 ? void 0 : _b.ADMIN_CHAT_ID)) {
         next();
+    }
+    else {
+        ctx.reply("This bot just work with admin");
     }
 }
 function handleImage(ctx) {
-    ctx.reply("Do you want to add this image to the schedule?", {
-        reply_markup: {
-            inline_keyboard: [
-                [
-                    { text: "Yes", callback_data: "add_image" },
-                    { text: "No", callback_data: "cancel" },
+    var _a, _b;
+    let photo = (_a = ctx.message) === null || _a === void 0 ? void 0 : _a.photo;
+    if (photo) {
+        photo.sort((a, b) => b.width - a.width);
+        ctx.replyWithPhoto(photo[0].file_id, {
+            reply_to_message_id: (_b = ctx.message) === null || _b === void 0 ? void 0 : _b.message_id,
+            caption: "Do you want to add this image to the schedule?",
+            reply_markup: {
+                inline_keyboard: [
+                    [
+                        { text: "Yes", callback_data: "add_image" },
+                        { text: "No", callback_data: "cancel" },
+                    ],
                 ],
-            ],
-        },
-    });
+            },
+        });
+    }
 }
-function handleCallbackQuery(ctx) {
-    var _a, _b, _c, _d;
-    if (((_a = ctx.callbackQuery) === null || _a === void 0 ? void 0 : _a.data) === "add_image") {
-        let photo = (_c = (_b = ctx.callbackQuery) === null || _b === void 0 ? void 0 : _b.message) === null || _c === void 0 ? void 0 : _c.photo;
-        // Add the image to the list
-        if (photo) {
-            const imageId = photo[photo.length - 1].file_id;
-            scheduledPhotosPush(imageId);
-            ctx.reply("Image added to the list.");
+bot.callbackQuery("add_image", (ctx) => __awaiter(void 0, void 0, void 0, function* () {
+    var _b, _c, _d, _e;
+    console.log("add image callBackQuery");
+    let photo = (_c = (_b = ctx.callbackQuery) === null || _b === void 0 ? void 0 : _b.message) === null || _c === void 0 ? void 0 : _c.photo;
+    // Add the image to the list
+    if (photo) {
+        const imageId = photo[photo.length - 1].file_id;
+        scheduledPhotosPush(imageId);
+        let chatId = (_d = ctx.chat) === null || _d === void 0 ? void 0 : _d.id;
+        let message = ctx.callbackQuery.message;
+        if (!!chatId && !!(message === null || message === void 0 ? void 0 : message.message_id)) {
+            yield ctx.reply("Image added to the list.", {
+                reply_to_message_id: (_e = message === null || message === void 0 ? void 0 : message.reply_to_message) === null || _e === void 0 ? void 0 : _e.message_id,
+            });
+            yield bot.api.deleteMessage(chatId, message.message_id);
+            yield ctx.answerCallbackQuery();
         }
     }
-    else if (((_d = ctx.callbackQuery) === null || _d === void 0 ? void 0 : _d.data) === "cancel") {
-        // Do nothing
-        ctx.reply("Cancelled.");
+}));
+bot.callbackQuery("cancel", (ctx) => __awaiter(void 0, void 0, void 0, function* () {
+    var _f, _g;
+    let chatId = (_f = ctx.chat) === null || _f === void 0 ? void 0 : _f.id;
+    let message = ctx.callbackQuery.message;
+    if (!!chatId && !!(message === null || message === void 0 ? void 0 : message.message_id)) {
+        yield ctx.reply("Cancelled.", {
+            reply_to_message_id: (_g = message === null || message === void 0 ? void 0 : message.reply_to_message) === null || _g === void 0 ? void 0 : _g.message_id,
+        });
+        yield bot.api.deleteMessage(chatId, message.message_id);
+        yield ctx.answerCallbackQuery();
     }
-}
+}));
 function sendScheduledPhotos() {
     var _a;
+    console.log(scheduledPhotos.length);
     if (scheduledPhotos.length > 0) {
         const imageId = scheduledPhotos[0];
-        bot.api.sendPhoto((_a = process.env) === null || _a === void 0 ? void 0 : _a.CHANNEL_CHAT_ID, imageId); // Send the image
+        bot.api.sendPhoto((_a = process.env) === null || _a === void 0 ? void 0 : _a.CHAT_ID, imageId); // Send the image
         scheduledPhotosShift(); // Remove the image from the list
     }
 }
@@ -129,8 +138,7 @@ if (fs.existsSync("./images.json")) {
 }
 // Set up a command to handle images sent by the user
 bot.on("message:photo", onlyAdmin, handleImage);
-// Set up a handler for inline callback queries
-bot.on("callback_query", handleCallbackQuery);
 // Set up a scheduled task to send the first image in the list every day at 8:00 PM
-cron.schedule("0 20 * * *", sendScheduledPhotos);
+cron.schedule("* * 20 * * *", sendScheduledPhotos);
+// start bot
 bot.start();
