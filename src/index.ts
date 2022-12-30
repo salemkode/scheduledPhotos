@@ -122,8 +122,14 @@ bot.on(["message:photo", "message:video", "message:text"], onlyAdmin, (ctx) => {
   });
 });
 
+/* cron timer */
+const options = {
+  scheduled: true,
+  timezone: "Asia/Kuwait",
+};
+
 // Set up a scheduled task to send the first image in the list every day at 8:00 PM
-cron.schedule("0 22,17 * * *", sendScheduledMedia);
+cron.schedule("0 17,20 * * *", sendScheduledMedia, options);
 
 //
 bot.command("work", (ctx) => {
