@@ -101,7 +101,8 @@ async function sendScheduledMedia() {
 
 // Read the images from the JSON file if it exists
 if (fs.existsSync(scheduledPath)) {
-  scheduled = JSON.parse(fs.readFileSync(scheduledPath, "utf8"));
+  let scheduledFile = fs.readFileSync(scheduledPath, "utf8").trim();
+  scheduled = scheduledFile === "" /* if file is empty */ ? JSON.parse(scheduledFile) : [];
 } else {
   fs.writeFileSync(scheduledPath, "[]");
 }
