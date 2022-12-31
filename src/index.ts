@@ -107,6 +107,25 @@ if (fs.existsSync(scheduledPath)) {
   fs.writeFileSync(scheduledPath, "[]");
 }
 
+/* cron timer */
+const options = {
+  scheduled: true,
+  timezone: "Asia/Kuwait",
+};
+
+// Set up a scheduled task to send the first image in the list every day at 8:00 PM
+cron.schedule("0 17,20 * * *", sendScheduledMedia, options);
+
+//
+bot.command("status", onlyAdmin, (ctx) => {
+  ctx.reply("Schedule media length is : " + scheduled.length);
+});
+
+//
+bot.command("start", (ctx) => {
+  ctx.reply("Welcome " + ctx.from?.username);
+});
+
 // Set up a command to handle images sent by the user
 bot.on(["message:photo", "message:video", "message:text"], onlyAdmin, (ctx) => {
   ctx.reply("Do you want to add this photo to the schedule?", {
@@ -120,20 +139,6 @@ bot.on(["message:photo", "message:video", "message:text"], onlyAdmin, (ctx) => {
       ],
     },
   });
-});
-
-/* cron timer */
-const options = {
-  scheduled: true,
-  timezone: "Asia/Kuwait",
-};
-
-// Set up a scheduled task to send the first image in the list every day at 8:00 PM
-cron.schedule("0 17,20 * * *", sendScheduledMedia, options);
-
-//
-bot.command("work", (ctx) => {
-  ctx.reply("The bot is work");
 });
 
 // start bot
