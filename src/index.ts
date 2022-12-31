@@ -107,7 +107,7 @@ if (fs.existsSync(scheduledPath)) {
   fs.writeFileSync(scheduledPath, "[]");
 }
 
-/* cron timer */ر
+/* cron timer */
 const options = {
   scheduled: true,
   timezone: "Asia/Kuwait",
