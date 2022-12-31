@@ -21,6 +21,7 @@ if (!fs.existsSync(".env")) {
 
 dotenv.config();
 const bot = new Bot(process.env?.BOT_TOKEN as string);
+let chatId = process.env?.CHAT_ID;
 
 type scheduledType = "Photo" | "Video" | "Text";
 let scheduledPath = "./scheduled.json";
@@ -47,29 +48,27 @@ function onlyAdmin(ctx: Context, next: NextFunction) {
 
 bot.callbackQuery("add_media", async (ctx) => {
   let media = getReplyMessageScheduled(ctx);
+  let chatId = ctx.chat?.id;
+  let message = ctx.callbackQuery.message;
 
-  // Add the image to the list
-  if (media) {
+  if (media && !!chatId && !!message?.message_id) {
+    // Add the image to the list
     scheduledPush(media.type, media.value);
-
-    let chatId = ctx.chat?.id;
-    let message = ctx.callbackQuery.message;
-    if (!!chatId && !!message?.message_id) {
-      await ctx.reply("Media added to the list.", {
-        reply_to_message_id: message?.reply_to_message?.message_id,
-      });
-      await bot.api.deleteMessage(chatId, message.message_id);
-      await ctx.answerCallbackQuery();
-    }
+    await ctx.reply("Media added to the list.", {
+      reply_to_message_id: message?.reply_to_message?.message_id,
+    });
+    await bot.api.deleteMessage(chatId, message.message_id);
   } else {
     await ctx.reply("Can not add media to the list.");
   }
+  await ctx.answerCallbackQuery();
 });
 
 function getReplyMessageScheduled(ctx: Context): schedule | undefined {
-  let photo = ctx.callbackQuery?.message?.reply_to_message?.photo;
-  let video = ctx.callbackQuery?.message?.reply_to_message?.video;
-  let text = ctx.callbackQuery?.message?.reply_to_message?.text;
+  let reply_to_message = ctx.callbackQuery?.message?.reply_to_message;
+  let photo = reply_to_message?.photo;
+  let video = reply_to_message?.video;
+  let text = reply_to_message?.text;
 
   // Add the image to the list
   if (photo) {
@@ -87,13 +86,13 @@ async function sendScheduledMedia() {
     const media = scheduled[0];
     switch (media.type) {
       case "Photo":
-        await bot.api.sendPhoto(process.env?.CHAT_ID as string, media.value);
+        await bot.api.sendPhoto(chatId as string, media.value);
         break;
       case "Text":
-        await bot.api.sendMessage(process.env?.CHAT_ID as string, media.value);
+        await bot.api.sendMessage(chatId as string, media.value);
         break;
       case "Video":
-        await bot.api.sendVideo(process.env?.CHAT_ID as string, media.value);
+        await bot.api.sendVideo(chatId as string, media.value);
         break;
     }
     scheduledShift(); // Remove the image from the list
@@ -107,7 +106,7 @@ if (fs.existsSync(scheduledPath)) {
   fs.writeFileSync(scheduledPath, "[]");
 }
 
-/* cron timer */
+/* cron timer */ر
 const options = {
   scheduled: true,
   timezone: "Asia/Kuwait",
