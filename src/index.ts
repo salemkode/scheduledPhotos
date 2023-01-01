@@ -26,7 +26,12 @@ const bot = new Bot(process.env?.BOT_TOKEN as string);
 let chatId = process.env?.CHAT_ID;
 
 type scheduledType = "Photo" | "Video" | "Text";
-type schedule = { type: scheduledType; value: string; caption?: string };
+type schedule = {
+  id: number;
+  type: scheduledType;
+  value: string;
+  caption?: string;
+};
 
 function onlyAdmin(ctx: Context, next: NextFunction) {
   if (ctx.chat?.id == process.env?.ADMIN_CHAT_ID) {
@@ -64,26 +69,32 @@ function getReplyMessageScheduled(ctx: Context): schedule | undefined {
   let message = ctx.callbackQuery
     ? ctx.callbackQuery.message?.reply_to_message
     : ctx.message?.reply_to_message;
-  let photo = message?.photo;
-  let video = message?.video;
-  let text = message?.text;
 
   // Add the image to the list
-  if (photo) {
-    photo.sort((a, b) => b.width - a.width);
-    return {
-      type: "Photo",
-      value: photo[0].file_id,
-      caption: message?.caption,
-    };
-  } else if (video) {
-    return {
-      type: "Video",
-      value: video.file_id,
-      caption: message?.caption,
-    };
-  } else if (text) {
-    return { type: "Text", value: text };
+  if (message) {
+    let { message_id, photo, video, text } = message;
+    if (photo) {
+      photo.sort((a, b) => b.width - a.width);
+      return {
+        id: message_id,
+        type: "Photo",
+        value: photo[0].file_id,
+        caption: message?.caption,
+      };
+    } else if (video) {
+      return {
+        id: message_id,
+        type: "Video",
+        value: video.file_id,
+        caption: message?.caption,
+      };
+    } else if (text) {
+      return {
+        id: message_id,
+        type: "Text",
+        value: text,
+      };
+    }
   }
 }
 
@@ -131,35 +142,32 @@ bot.command("status", onlyAdmin, async (ctx) => {
 
 //
 bot.command("remove-all", onlyAdmin, async (ctx) => {
-  let count = await prisma.message.deleteMany();
+  let { count } = await prisma.message.deleteMany();
   ctx.reply(`all message was delate: ${count} message`);
 });
 
 //
 bot.command("remove", onlyAdmin, async (ctx) => {
   let media = getReplyMessageScheduled(ctx);
-  let message = "Please reply to message if you want delete it";
+  let replyMessage = "Please reply to message if you want delete it";
   if (media) {
-    let { count } = await prisma.message.deleteMany({
-      where: {
-        value: media.value,
-      },
-    });
+    let message = await prisma.message
+      .delete({
+        where: {
+          id: media.id,
+        },
+      })
+      .catch((_) => undefined);
 
-    console.log(count);
-    if (count === 1) {
-      message = "This massage was delete";
-    } else if (count === 0) {
-      message =
-        "This message does not exist. The message may have already been sent.";
+    if (message) {
+      replyMessage = "This massage was delete";
     } else {
-      // TODO: This will happen in Text Type
-      message =
-        `There are ${count} message with the same value. They were all deleted`;
+      replyMessage =
+        "This message does not exist. The message may have already been sent.";
     }
   }
 
-  ctx.reply(message);
+  ctx.reply(replyMessage);
 });
 
 //
