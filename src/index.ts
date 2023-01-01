@@ -72,13 +72,13 @@ function getReplyMessageScheduled(ctx: Context): schedule | undefined {
     return {
       type: "Photo",
       value: photo[0].file_id,
-      caption: ctx.message?.caption,
+      caption: reply_to_message?.caption,
     };
   } else if (video) {
     return {
       type: "Video",
       value: video.file_id,
-      caption: ctx.message?.caption,
+      caption: reply_to_message?.caption,
     };
   } else if (text) {
     return { type: "Text", value: text };
@@ -88,22 +88,20 @@ function getReplyMessageScheduled(ctx: Context): schedule | undefined {
 async function sendScheduledMedia() {
   let message = await prisma.message.findFirst();
   if (message) {
-    if (message) {
-      switch (message.type) {
-        case "Photo":
-          await bot.api.sendPhoto(chatId as string, message.value, {
-            caption: message.caption || "",
-          });
-          break;
-        case "Video":
-          await bot.api.sendVideo(chatId as string, message.value, {
-            caption: message.caption || "",
-          });
-          break;
-        case "Text":
-          await bot.api.sendMessage(chatId as string, message.value);
-          break;
-      }
+    switch (message.type) {
+      case "Photo":
+        await bot.api.sendPhoto(chatId as string, message.value, {
+          caption: message.caption || "",
+        });
+        break;
+      case "Video":
+        await bot.api.sendVideo(chatId as string, message.value, {
+          caption: message.caption || "",
+        });
+        break;
+      case "Text":
+        await bot.api.sendMessage(chatId as string, message.value);
+        break;
     }
 
     await prisma.message.delete({
