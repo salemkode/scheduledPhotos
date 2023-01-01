@@ -61,10 +61,12 @@ bot.callbackQuery("add_media", async (ctx) => {
 });
 
 function getReplyMessageScheduled(ctx: Context): schedule | undefined {
-  let reply_to_message = ctx.callbackQuery?.message?.reply_to_message;
-  let photo = reply_to_message?.photo;
-  let video = reply_to_message?.video;
-  let text = reply_to_message?.text;
+  let message = ctx.callbackQuery
+    ? ctx.callbackQuery.message?.reply_to_message
+    : ctx.message?.reply_to_message;
+  let photo = message?.photo;
+  let video = message?.video;
+  let text = message?.text;
 
   // Add the image to the list
   if (photo) {
@@ -72,13 +74,13 @@ function getReplyMessageScheduled(ctx: Context): schedule | undefined {
     return {
       type: "Photo",
       value: photo[0].file_id,
-      caption: reply_to_message?.caption,
+      caption: message?.caption,
     };
   } else if (video) {
     return {
       type: "Video",
       value: video.file_id,
-      caption: reply_to_message?.caption,
+      caption: message?.caption,
     };
   } else if (text) {
     return { type: "Text", value: text };
@@ -123,8 +125,41 @@ cron.schedule("0 17,20 * * *", sendScheduledMedia, options);
 
 //
 bot.command("status", onlyAdmin, async (ctx) => {
-  let length = await prisma.message.count();
-  ctx.reply("Schedule media length is : " + length);
+  let count = await prisma.message.count();
+  ctx.reply(`Schedule media length is : ${count}`);
+});
+
+//
+bot.command("remove-all", onlyAdmin, async (ctx) => {
+  let count = await prisma.message.deleteMany();
+  ctx.reply(`all message was delate: ${count} message`);
+});
+
+//
+bot.command("remove", onlyAdmin, async (ctx) => {
+  let media = getReplyMessageScheduled(ctx);
+  let message = "Please reply to message if you want delete it";
+  if (media) {
+    let { count } = await prisma.message.deleteMany({
+      where: {
+        value: media.value,
+      },
+    });
+
+    console.log(count);
+    if (count === 1) {
+      message = "This massage was delete";
+    } else if (count === 0) {
+      message =
+        "This message does not exist. The message may have already been sent.";
+    } else {
+      // TODO: This will happen in Text Type
+      message =
+        `There are ${count} message with the same value. They were all deleted`;
+    }
+  }
+
+  ctx.reply(message);
 });
 
 //
