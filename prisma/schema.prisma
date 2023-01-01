@@ -1,0 +1,15 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./scheduled.db"
+}
+
+model Message {
+  id    Int   @unique   @id @default(autoincrement())
+  type String 
+  value  String
+  caption  String?
+}

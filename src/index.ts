@@ -3,6 +3,8 @@ import * as cron from "node-cron";
 import * as fs from "fs";
 import * as dotenv from "dotenv";
 import promptSync from "prompt-sync";
+import { PrismaClient } from "@prisma/client";
+const prisma = new PrismaClient();
 
 // Check if the .env file exists
 if (!fs.existsSync(".env")) {
@@ -24,19 +26,7 @@ const bot = new Bot(process.env?.BOT_TOKEN as string);
 let chatId = process.env?.CHAT_ID;
 
 type scheduledType = "Photo" | "Video" | "Text";
-let scheduledPath = "./scheduled.json";
-type schedule = { type: scheduledType; value: string };
-let scheduled: schedule[] = []; // Create an empty array to store the scheduled image IDs
-
-function scheduledPush(type: scheduledType, value: string) {
-  scheduled.push({ type, value });
-  fs.writeFileSync(scheduledPath, JSON.stringify(scheduled));
-}
-
-function scheduledShift() {
-  scheduled.shift();
-  fs.writeFileSync(scheduledPath, JSON.stringify(scheduled));
-}
+type schedule = { type: scheduledType; value: string; caption?: string };
 
 function onlyAdmin(ctx: Context, next: NextFunction) {
   if (ctx.chat?.id == process.env?.ADMIN_CHAT_ID) {
@@ -53,10 +43,16 @@ bot.callbackQuery("add_media", async (ctx) => {
 
   if (media && !!chatId && !!message?.message_id) {
     // Add the image to the list
-    scheduledPush(media.type, media.value);
+    await prisma.message.create({
+      data: media,
+    });
+
+    // Alert user when media was added
     await ctx.reply("Media added to the list.", {
       reply_to_message_id: message?.reply_to_message?.message_id,
     });
+
+    // Remove add media message
     await bot.api.deleteMessage(chatId, message.message_id);
   } else {
     await ctx.reply("Can not add media to the list.");
@@ -73,38 +69,49 @@ function getReplyMessageScheduled(ctx: Context): schedule | undefined {
   // Add the image to the list
   if (photo) {
     photo.sort((a, b) => b.width - a.width);
-    return { type: "Photo", value: photo[0].file_id };
+    return {
+      type: "Photo",
+      value: photo[0].file_id,
+      caption: ctx.message?.caption,
+    };
   } else if (video) {
-    return { type: "Video", value: video.file_id };
+    return {
+      type: "Video",
+      value: video.file_id,
+      caption: ctx.message?.caption,
+    };
   } else if (text) {
     return { type: "Text", value: text };
   }
 }
 
 async function sendScheduledMedia() {
-  if (scheduled.length > 0) {
-    const media = scheduled[0];
-    switch (media.type) {
-      case "Photo":
-        await bot.api.sendPhoto(chatId as string, media.value);
-        break;
-      case "Text":
-        await bot.api.sendMessage(chatId as string, media.value);
-        break;
-      case "Video":
-        await bot.api.sendVideo(chatId as string, media.value);
-        break;
+  let message = await prisma.message.findFirst();
+  if (message) {
+    if (message) {
+      switch (message.type) {
+        case "Photo":
+          await bot.api.sendPhoto(chatId as string, message.value, {
+            caption: message.caption || "",
+          });
+          break;
+        case "Video":
+          await bot.api.sendVideo(chatId as string, message.value, {
+            caption: message.caption || "",
+          });
+          break;
+        case "Text":
+          await bot.api.sendMessage(chatId as string, message.value);
+          break;
+      }
     }
-    scheduledShift(); // Remove the image from the list
-  }
-}
 
-// Read the images from the JSON file if it exists
-if (fs.existsSync(scheduledPath)) {
-  let scheduledFile = fs.readFileSync(scheduledPath, "utf8").trim();
-  scheduled = scheduledFile === "" /* if file is empty */ ? JSON.parse(scheduledFile) : [];
-} else {
-  fs.writeFileSync(scheduledPath, "[]");
+    await prisma.message.delete({
+      where: {
+        id: message.id,
+      },
+    });
+  }
 }
 
 /* cron timer */
@@ -117,8 +124,9 @@ const options = {
 cron.schedule("0 17,20 * * *", sendScheduledMedia, options);
 
 //
-bot.command("status", onlyAdmin, (ctx) => {
-  ctx.reply("Schedule media length is : " + scheduled.length);
+bot.command("status", onlyAdmin, async (ctx) => {
+  let length = await prisma.message.count();
+  ctx.reply("Schedule media length is : " + length);
 });
 
 //
