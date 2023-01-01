@@ -141,7 +141,7 @@ bot.command("status", onlyAdmin, async (ctx) => {
 });
 
 //
-bot.command("remove-all", onlyAdmin, async (ctx) => {
+bot.command("remove_all", onlyAdmin, async (ctx) => {
   let { count } = await prisma.message.deleteMany();
   ctx.reply(`all message was delate: ${count} message`);
 });
