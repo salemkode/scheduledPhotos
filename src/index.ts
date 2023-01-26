@@ -25,7 +25,13 @@ dotenv.config();
 const bot = new Bot(process.env?.BOT_TOKEN as string);
 let chatId = process.env?.CHAT_ID;
 
-type scheduledType = "Photo" | "Video" | "Text";
+type scheduledType =
+  | "Photo"
+  | "Video"
+  | "Text"
+  | "Animation"
+  | "Document"
+  | "Audio";
 type schedule = {
   id: number;
   type: scheduledType;
@@ -72,7 +78,8 @@ function getReplyMessageScheduled(ctx: Context): schedule | undefined {
 
   // Add the image to the list
   if (message) {
-    let { message_id, photo, video, text } = message;
+    let { message_id, photo, video, text, animation, document, audio, sticker } =
+      message;
     if (photo) {
       photo.sort((a, b) => b.width - a.width);
       return {
@@ -94,6 +101,32 @@ function getReplyMessageScheduled(ctx: Context): schedule | undefined {
         type: "Text",
         value: text,
       };
+    } else if (animation) {
+      return {
+        id: message_id,
+        type: "Animation",
+        value: animation.file_id,
+      };
+    } else if (document) {
+      return {
+        id: message_id,
+        type: "Document",
+        value: document.file_id,
+      };
+    } else if (audio) {
+      return {
+        id: message_id,
+        type: "Audio",
+        value: audio.file_id,
+      };
+    } else if (sticker) {
+      return {
+        id: message_id,
+        type: "Audio",
+        value: sticker.file_id,
+      };
+    } else {
+      ctx.reply("This media not valid");
     }
   }
 }
@@ -114,6 +147,21 @@ async function sendScheduledMedia() {
         break;
       case "Text":
         await bot.api.sendMessage(chatId as string, message.value);
+        break;
+      case "Animation":
+        await bot.api.sendAnimation(chatId as string, message.value, {
+          caption: message.caption || "",
+        });
+        break;
+      case "Document":
+        await bot.api.sendDocument(chatId as string, message.value, {
+          caption: message.caption || "",
+        });
+        break;
+      case "Audio":
+        await bot.api.sendAudio(chatId as string, message.value, {
+          caption: message.caption || "",
+        });
         break;
     }
 
@@ -176,19 +224,35 @@ bot.command("start", (ctx) => {
 });
 
 // Set up a command to handle images sent by the user
-bot.on(["message:photo", "message:video", "message:text"], onlyAdmin, (ctx) => {
-  ctx.reply("Do you want to add this photo to the schedule?", {
-    reply_to_message_id: ctx.message?.message_id,
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: "Yes", callback_data: "add_media" },
-          { text: "No", callback_data: "cancel" },
+bot.on(
+  [
+    "message:photo",
+    "message:video",
+    "message:text",
+    "message:animation",
+    "message:document",
+    "message:audio",
+    "message:sticker"
+  ],
+  onlyAdmin,
+  (ctx) => {
+    ctx.reply("Do you want to add this photo to the schedule?", {
+      reply_to_message_id: ctx.message?.message_id,
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: "Yes", callback_data: "add_media" },
+            { text: "No", callback_data: "cancel" },
+          ],
         ],
-      ],
-    },
-  });
-});
+      },
+    });
+  }
+);
+
+bot.on("message", (ctx) => {
+  ctx.reply("This type of message not valid");
+})
 
 // start bot
 bot.start();
